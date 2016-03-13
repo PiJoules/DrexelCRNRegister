@@ -31,14 +31,27 @@ class RegistrationError(object):
     def from_bs4_elem_tag(cls, elem):
         """Create a reg err from a beautiful soup 4 element tag."""
         td_elems = elem.find_all("td")
-        return cls([x.text.strip() for x in td_elems])
+        return cls(*[x.text.strip() for x in td_elems])
 
     def __str__(self):
         return str({attr: getattr(self, attr) for attr in self.__slots__})
 
 
 def register(username, password, crns):
-    """Register a user for classes given a list of crns."""
+    """
+    Register a user for classes given a list of crns.
+
+    username:
+        Drexel id matching [a-z]{2,3}\d{2,3}
+    password:
+        Drexel login password
+    crns:
+        List of crns as strings
+
+    return:
+        List of RegistrationError objects. Empty list means successful
+        registration for all crns provided.
+    """
     # Create browser.
     # Use PhantomJS since we don't need to render any html.
     browser = webdriver.PhantomJS()
@@ -68,7 +81,7 @@ def register(username, password, crns):
     # They follow the pattern "crn_id\d" with a max of 10 inputs.
     for i in xrange(min(10, len(crns))):
         crn = crns[i]
-        elem = browser.find_element_by_id("crn_id" + str(i))
+        elem = browser.find_element_by_id("crn_id" + str(i + 1))
         elem.send_keys(crn)
 
     # Submit crns
@@ -82,7 +95,11 @@ def register(username, password, crns):
         # Registration errors are in datadisplaytable.
         # First row is table header.
         soup = BeautifulSoup(html, "html.parser")
-        error_elems = soup.find(**{"class": "datadisplaytable"}).find_all("tr")[1:]
+        attrs = {
+            "summary": "This layout table is used to present Registration Errors.",
+            "class": "datadisplaytable"
+        }
+        error_elems = soup.find(**attrs).find_all("tr")[1:]
         errors = [RegistrationError.from_bs4_elem_tag(tag) for tag in error_elems]
     else:
         # No errors
@@ -92,8 +109,4 @@ def register(username, password, crns):
     browser.quit()
 
     return errors
-
-
-if __name__ == "__main__":
-    print(map(str, register("lc599", "gg3mkp9w", ["34044"])))
 
